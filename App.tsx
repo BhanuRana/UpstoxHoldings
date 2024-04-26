@@ -1,118 +1,79 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
+import React, {useEffect, useState} from 'react';
+import {StatusBar, SafeAreaView, Alert} from 'react-native';
+import Header from './src/components/Header';
+import HoldingsList from './src/components/HoldingsList';
+import BottomSheet from './src/components/BottomSheet';
+import {fetchHoldings} from './src/utils/api';
+import {Holding, Totals} from './src/utils/types';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+  getCurrentValue,
+  getInvestmentValue,
+  getProfitAndLoss,
+  getTodayProfitAndLoss,
+} from './src/utils/helpers';
+import {styles} from './src/styles';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const App: React.FC = () => {
+  const defaultTotalState: Totals = {
+    currentValue: 0,
+    investment: 0,
+    profitAndLoss: 0,
+    profitAndLossToday: 0,
+  };
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  const [holdings, setHoldings] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [totals, setTotals] = useState(defaultTotalState);
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  useEffect(() => {
+    fetchMyHoldings();
+  }, []);
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const fetchMyHoldings = () => {
+    setRefreshing(true);
+    fetchHoldings()
+      .then(data => {
+        if (data.userHolding) {
+          const totalsData: Totals = data.userHolding.reduce(
+            (acc: Totals, holding: Holding) => ({
+              currentValue: acc.currentValue + getCurrentValue(holding),
+              investment: acc.investment + getInvestmentValue(holding),
+              profitAndLoss: acc.profitAndLoss + getProfitAndLoss(holding),
+              profitAndLossToday:
+                acc.profitAndLossToday + getTodayProfitAndLoss(holding),
+            }),
+            defaultTotalState,
+          );
+          setTotals(totalsData);
+          setHoldings(data.userHolding);
+        } else {
+          Alert.alert(`Currently you don't have any holdings`);
+        }
+        setRefreshing(false);
+      })
+      .catch(error => {
+        console.error('Error fetching holdings:', error);
+        setRefreshing(false);
+      });
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <SafeAreaView style={styles.root}>
+      <StatusBar barStyle={'dark-content'} backgroundColor={'#ffffff'} />
+      <Header />
+      <HoldingsList
+        holdings={holdings}
+        refreshing={refreshing}
+        fetchHoldings={fetchMyHoldings}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
+      <BottomSheet
+        totals={totals}
+        isSheetOpen={isSheetOpen}
+        toggleSheet={() => setIsSheetOpen(!isSheetOpen)}
+      />
     </SafeAreaView>
   );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
 export default App;
