@@ -32,6 +32,8 @@ const App: React.FC = () => {
 
   const fetchMyHoldings = () => {
     setRefreshing(true);
+    setHoldings([]);
+    setTotals(defaultTotalState);
     fetchHoldings()
       .then(data => {
         if (data.userHolding) {
